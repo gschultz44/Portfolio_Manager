@@ -1,7 +1,10 @@
+import MetricsChart from "./components/MetricsChart";
+
 function App() {
   return (
-    <div style={{ textAlign: "center", marginTop: "50px" }}>
-      <h1>Portfolio Manager</h1>
+    <div>
+      <h1>Stock Prices</h1>
+      <MetricsChart />
     </div>
   );
 }
