@@ -1,4 +1,3 @@
-// imports
 import React, { useEffect, useState } from "react";
 import {
   LineChart,
@@ -11,84 +10,147 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import Papa from "papaparse";
+import sunnyImage from "../assets/sunny.jpeg";
+import rainyImage from "../assets/rain.jpeg";
 
 const MetricsChart = () => {
-  const [data, setData] = useState([]);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
 
+  // Parse CSV and aggregate: monthly last close
   useEffect(() => {
     Papa.parse("/5yr_snp500.csv", {
       download: true,
       header: true,
       dynamicTyping: true,
-      complete: (result) => {
-        // Aggregate data by month
-        const monthlyData = {};
-        result.data.forEach((row) => {
-          if (!row.date || !row.close) return;
-          const month = row.date.slice(0, 7); // YYYY-MM
-          if (!monthlyData[month]) {
-            monthlyData[month] = { date: month, closeSum: 0, count: 0 };
+      complete: ({ data }) => {
+        const daily = data.filter((d) => d.date && d.close);
+        const byMonth = {};
+        daily.forEach((row) => {
+          const key = row.date.slice(0, 7); // YYYY-MM
+          if (!byMonth[key] || row.date > byMonth[key].__lastDate) {
+            byMonth[key] = { date: key, close: Number(row.close), __lastDate: row.date };
           }
-          monthlyData[month].closeSum += row.close;
-          monthlyData[month].count += 1;
         });
-
-        const cleanedData = Object.values(monthlyData).map((item) => ({
-          date: item.date,
-          close: item.closeSum / item.count,
-        }));
-
-        setData(cleanedData);
+        const monthlyArr = Object.values(byMonth)
+          .sort((a, b) => new Date(a.date) - new Date(b.date))
+          .map(({ date, close }) => ({ date, close }));
+        setMonthlyData(monthlyArr);
       },
     });
   }, []);
 
+  // Decide background image (hovered month vs latest month trend)
+  let bg = null;
+  if (hoveredIndex !== null && hoveredIndex > 0 && hoveredIndex < monthlyData.length) {
+    const cur = monthlyData[hoveredIndex].close;
+    const prev = monthlyData[hoveredIndex - 1].close;
+    bg = cur >= prev ? sunnyImage : rainyImage;
+  } else if (monthlyData.length >= 2) {
+    const last = monthlyData[monthlyData.length - 1].close;
+    const prev = monthlyData[monthlyData.length - 2].close;
+    bg = last >= prev ? sunnyImage : rainyImage;
+  }
+
   return (
     <div
       style={{
+        position: "relative",
+        minHeight: "100vh",
         width: "100vw",
-        height: "100vh",
-        backgroundColor: "black",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
+        overflow: "hidden",
+        backgroundColor: "#000", // fallback
+        backgroundImage: bg ? `url(${bg})` : "none",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        transition: "background-image 300ms ease-in-out",
       }}
     >
-      <div style={{ width: "90%", height: "90%" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <CartesianGrid stroke="#444" strokeWidth={1.5} strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              stroke="#fff"
-              tick={{ fontSize: 16, fill: "#fff" }}
-            />
-            <YAxis
-              stroke="#fff"
-              tick={{ fontSize: 16, fill: "#fff" }}
-              strokeWidth={2}
-              allowDecimals={false}
-            />
-            <Tooltip
-              contentStyle={{ backgroundColor: "#1f2937", border: "none", color: "#fff" }}
-              itemStyle={{ color: "#fff" }}
-            />
-            <Legend wrapperStyle={{ color: "#fff", fontSize: 16 }} />
-            <Line
-              type="monotone"
-              dataKey="close"
-              stroke="#60a5fa"
-              strokeWidth={4}
-              dot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+      {/* Top overlay bar (no text, just darkens background behind the 'header' zone) */}
+      <div
+        style={{
+          height: 68,
+          background: "rgba(0,0,0,0.55)",
+          backdropFilter: "blur(2px)",
+        }}
+      />
+
+      {/* Chart section */}
+      <div
+        style={{
+          minHeight: "calc(100vh - 68px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+        }}
+      >
+        <div
+          style={{
+            width: "92%",
+            height: "85vh",
+            maxHeight: 820,
+            background: "rgba(0,0,0,0.65)",
+            borderRadius: 16,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            padding: 16,
+          }}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={monthlyData}
+              onMouseMove={(state) => {
+                if (state && state.isTooltipActive) {
+                  setHoveredIndex(state.activeTooltipIndex ?? null);
+                } else {
+                  setHoveredIndex(null);
+                }
+              }}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              <CartesianGrid strokeDasharray="4 4" stroke="#444" />
+              <XAxis
+                dataKey="date"
+                stroke="#e5e7eb"
+                tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
+                axisLine={{ stroke: "#e5e7eb", strokeWidth: 2 }}
+                tickLine={{ stroke: "#e5e7eb" }}
+              />
+              <YAxis
+                stroke="#e5e7eb"
+                tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
+                axisLine={{ stroke: "#e5e7eb", strokeWidth: 2 }}
+                tickLine={{ stroke: "#e5e7eb" }}
+                allowDecimals
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#0b1220",
+                  border: "1px solid #94a3b8",
+                  color: "#fff",
+                  borderRadius: 8,
+                }}
+                labelStyle={{ color: "#e5e7eb", fontWeight: 700 }}
+                itemStyle={{ color: "#e5e7eb" }}
+              />
+              {/* Legend in white */}
+              <Legend wrapperStyle={{ color: "#fff", fontSize: 16, fontWeight: 700 }} />
+              <Line
+                type="monotone"
+                dataKey="close"
+                name="Close"
+                stroke="#60a5fa"
+                strokeWidth={4}
+                dot={false}
+                activeDot={{ r: 6, stroke: "#e5e7eb", strokeWidth: 2 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
 };
 
 export default MetricsChart;
-
-
-
