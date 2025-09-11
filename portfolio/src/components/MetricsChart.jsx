@@ -135,11 +135,11 @@ const MetricsChart = () => {
                 itemStyle={{ color: "#e5e7eb" }}
               />
               {/* Legend in white */}
-              <Legend wrapperStyle={{ color: "#fff", fontSize: 16, fontWeight: 700 }} />
+              {/* </ResponsiveContainer>Legend wrapperStyle={{ color: "#fff", fontSize: 16, fontWeight: 700 }} /> */}
               <Line
                 type="monotone"
                 dataKey="close"
-                name="Close"
+                //name="Close"
                 stroke="#60a5fa"
                 strokeWidth={4}
                 dot={false}
