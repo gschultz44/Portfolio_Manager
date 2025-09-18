@@ -33,6 +33,38 @@ function pickBackground(streak) {
   return abs >= 2 ? rainyImage2 : rainyImage;
 }
 
+// ✅ Custom Legend: removes suffixes & replaces underscores with spaces
+const CustomLegend = ({ payload }) => (
+  <div
+    style={{
+      display: "flex",
+      flexWrap: "wrap",
+      gap: "12px",
+      marginTop: "10px",
+    }}
+  >
+    {payload?.map((entry) => {
+      const color = entry?.color || entry?.payload?.stroke || "#fff";
+      const raw = entry?.value ?? entry?.payload?.dataKey ?? "";
+      const clean = String(raw)
+        .replace(/_[^_]+$/, "") // removes last _suffix (like _Price)
+        .replace(/_/g, " "); // replaces remaining underscores with spaces
+      return (
+        <span
+          key={raw}
+          style={{
+            color,
+            fontWeight: "700",
+            fontSize: "14px",
+          }}
+        >
+          {clean}
+        </span>
+      );
+    })}
+  </div>
+);
+
 const MetricsChart = () => {
   const [chartData, setChartData] = useState([]);
   const [assets, setAssets] = useState([]);
@@ -44,7 +76,6 @@ const MetricsChart = () => {
       header: true,
       dynamicTyping: true,
       complete: ({ data }) => {
-        // Group rows by date
         const grouped = {};
         data.forEach((row) => {
           if (!row.Date || !row.Asset) return;
@@ -74,18 +105,16 @@ const MetricsChart = () => {
   const bg = chartData.length >= 2 ? pickBackground(streak) : null;
 
   const colorPalette = [
-    "#60a5fa", "#f43f5e", "#22c55e", "#eab308", "#a855f7", "#14b8a6", "#f97316",
-    "#d946ef", "#06b6d4", "#84cc16", "#ef4444", "#3b82f6", "#10b981", "#f59e0b",
-    "#8b5cf6", "#ec4899", "#0ea5e9", "#facc15", "#f87171", "#34d399"
+    "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
+    "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe",
+    "#008080", "#e6beff", "#9a6324", "#fffac8", "#800000",
+    "#aaffc3", "#808000", "#ffd8b1", "#000075", "#808080",
   ];
-  
-  function getColor(index) {
-    if (index < colorPalette.length) return colorPalette[index];
-    // Generate a new color dynamically if you have more assets than palette length
-    const hue = (index * 137.5) % 360; // golden angle for color variety
-    return `hsl(${hue}, 70%, 55%)`;
-  }
-  
+
+  const getColor = (index) =>
+    index < colorPalette.length
+      ? colorPalette[index]
+      : `hsl(${(index * 137.5) % 360}, 70%, 55%)`;
 
   return (
     <div
@@ -149,8 +178,12 @@ const MetricsChart = () => {
                 tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
               />
               <Tooltip
-                content={({ active, payload, label }) => {
+                content={({ active, payload }) => {
                   if (active && payload && payload.length) {
+                    const entry = payload[0];
+                    const cleanName = String(entry.name)
+                      .replace(/_[^_]+$/, "")
+                      .replace(/_/g, " ");
                     return (
                       <div
                         style={{
@@ -158,21 +191,21 @@ const MetricsChart = () => {
                           padding: "8px 12px",
                           borderRadius: "8px",
                           border: "1px solid #94a3b8",
+                          color: entry.color,
+                          fontWeight: "bold",
                         }}
                       >
-          {payload.map((entry) => (
-            <div key={entry.name} style={{ color: entry.color, fontWeight: "bold" }}>
-              {entry.name}: ${entry.value?.toLocaleString()}
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  }}
-/>
+                        {cleanName}: ${entry.value?.toLocaleString()}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
 
-              <Legend wrapperStyle={{ color: "#fff" }} />
+              {/* Custom legend with cleaned names and colored text */}
+              <Legend content={<CustomLegend />} />
+
               {assets.map((asset, i) => (
                 <Line
                   key={asset}
@@ -184,7 +217,6 @@ const MetricsChart = () => {
                   connectNulls
                 />
               ))}
-
             </LineChart>
           </ResponsiveContainer>
         </div>
