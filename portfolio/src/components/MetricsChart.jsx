@@ -10,11 +10,52 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import Papa from "papaparse";
+
+// ✅ Background Images
 import sunnyImage from "../assets/Sunny.png";
 import sunnyImage2 from "../assets/Sunny2.png";
 import rainyImage from "../assets/Rain.png";
 import rainyImage2 from "../assets/Rain2.png";
 
+// ✅ Import Logos
+import nasdaqLogo from "../assets/nasdaq_logo.jpeg";
+import amazonLogo from "../assets/amazon_logo.png";
+import appleLogo from "../assets/apple_logo.png";
+import bitcoinLogo from "../assets/bitcoin_logo.png";
+import ethereumLogo from "../assets/ethereum_logo.png";
+import gasLogo from "../assets/gas_logo.png";
+import goldLogo from "../assets/gold_logo.png";
+import googleLogo from "../assets/google_logo.png";
+import metaLogo from "../assets/meta_logo.png";
+import microsoftLogo from "../assets/microsoft_logo.png";
+import netflixLogo from "../assets/netflix_logo.png";
+import nvidiaLogo from "../assets/nvidia_logo.png";
+import oilLogo from "../assets/oil_logo.png";
+import sp500Logo from "../assets/s_p_500_logo.png";
+import silverLogo from "../assets/silver_logo.png";
+import teslaLogo from "../assets/tesla_logo.png";
+
+// ✅ Logo Map
+const assetLogos = {
+  "NASDAQ": nasdaqLogo,
+  "Amazon": amazonLogo,
+  "Apple": appleLogo,
+  "Bitcoin": bitcoinLogo,
+  "Ethereum": ethereumLogo,
+  "Natural Gas": gasLogo,
+  "Gold": goldLogo,
+  "Google": googleLogo,
+  "Meta": metaLogo,
+  "Microsoft": microsoftLogo,
+  "Netflix": netflixLogo,
+  "Nvidia": nvidiaLogo,
+  "Oil": oilLogo,
+  "S&P 500": sp500Logo,
+  "Silver": silverLogo,
+  "Tesla": teslaLogo,
+};
+
+// ✅ Helper: Calculate Up/Down Streaks
 function getStreak(data, index, key) {
   if (index <= 0) return 0;
   const direction = data[index][key] >= data[index - 1][key] ? "up" : "down";
@@ -27,39 +68,58 @@ function getStreak(data, index, key) {
   return direction === "up" ? streak : -streak;
 }
 
+// ✅ Helper: Choose Background
 function pickBackground(streak) {
   const abs = Math.abs(streak);
   if (streak >= 0) return abs >= 2 ? sunnyImage2 : sunnyImage;
   return abs >= 2 ? rainyImage2 : rainyImage;
 }
 
-// ✅ Custom Legend: removes suffixes & replaces underscores with spaces
+// ✅ Custom Legend with Logos
 const CustomLegend = ({ payload }) => (
   <div
     style={{
       display: "flex",
       flexWrap: "wrap",
-      gap: "12px",
+      gap: "16px",
       marginTop: "10px",
+      alignItems: "center",
     }}
   >
     {payload?.map((entry) => {
       const color = entry?.color || entry?.payload?.stroke || "#fff";
       const raw = entry?.value ?? entry?.payload?.dataKey ?? "";
       const clean = String(raw)
-        .replace(/_[^_]+$/, "") // removes last _suffix (like _Price)
-        .replace(/_/g, " "); // replaces remaining underscores with spaces
+        .replace(/_[^_]+$/, "")
+        .replace(/_/g, " ");
+      const logo = assetLogos[clean];
+
       return (
-        <span
+        <div
           key={raw}
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
             color,
             fontWeight: "700",
             fontSize: "14px",
           }}
         >
-          {clean}
-        </span>
+          {logo && (
+            <img
+              src={logo}
+              alt={`${clean} logo`}
+              style={{
+                width: 20,
+                height: 20,
+                objectFit: "contain",
+                borderRadius: "4px",
+              }}
+            />
+          )}
+          <span>{clean}</span>
+        </div>
       );
     })}
   </div>
@@ -94,23 +154,22 @@ const MetricsChart = () => {
     });
   }, []);
 
-  // Use S&P_500_Price as reference for background streak
+  // ✅ Background based on S&P 500 streak
   const indexToUse =
     hoveredIndex !== null ? hoveredIndex : chartData.length - 1;
   const streak =
     chartData.length > 1 && indexToUse >= 1
       ? getStreak(chartData, indexToUse, "S&P_500_Price")
       : 0;
-
   const bg = chartData.length >= 2 ? pickBackground(streak) : null;
 
+  // ✅ Color palette fallback
   const colorPalette = [
     "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
     "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe",
     "#008080", "#e6beff", "#9a6324", "#fffac8", "#800000",
     "#aaffc3", "#808000", "#ffd8b1", "#000075", "#808080",
   ];
-
   const getColor = (index) =>
     index < colorPalette.length
       ? colorPalette[index]
@@ -131,6 +190,24 @@ const MetricsChart = () => {
         transition: "background-image 300ms ease-in-out",
       }}
     >
+      {/* Title */}
+      <h1
+        style={{
+          position: "absolute",
+          top: 12,
+          left: "50%",
+          transform: "translateX(-50%)",
+          color: "white",
+          fontSize: "2rem",
+          fontWeight: "bold",
+          letterSpacing: "1px",
+          zIndex: 10,
+          textShadow: "0px 2px 6px rgba(0, 0, 0, 0.8)",
+        }}
+      >
+        Market Climate
+      </h1>
+
       <div
         style={{
           height: 68,
@@ -177,13 +254,20 @@ const MetricsChart = () => {
                 stroke="#e5e7eb"
                 tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
               />
+
+              {/* ✅ Tooltip with Logos + Sorted Values */}
               <Tooltip
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
-                    const entry = payload[0];
-                    const cleanName = String(entry.name)
-                      .replace(/_[^_]+$/, "")
-                      .replace(/_/g, " ");
+                    const validEntries = payload.filter(
+                      (entry) => entry.name && Number.isFinite(entry.value)
+                    );
+                    if (!validEntries.length) return null;
+
+                    const sortedPayload = validEntries.sort(
+                      (a, b) => b.value - a.value
+                    );
+
                     return (
                       <div
                         style={{
@@ -191,11 +275,45 @@ const MetricsChart = () => {
                           padding: "8px 12px",
                           borderRadius: "8px",
                           border: "1px solid #94a3b8",
-                          color: entry.color,
+                          color: "white",
                           fontWeight: "bold",
                         }}
                       >
-                        {cleanName}: ${entry.value?.toLocaleString()}
+                        {sortedPayload.map((entry) => {
+                          const cleanName = String(entry.name)
+                            .replace(/_[^_]+$/, "")
+                            .replace(/_/g, " ");
+                          const logo = assetLogos[cleanName];
+
+                          return (
+                            <div
+                              key={entry.name}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                color: entry.color,
+                                marginBottom: 4,
+                              }}
+                            >
+                              {logo && (
+                                <img
+                                  src={logo}
+                                  alt={`${cleanName} logo`}
+                                  style={{
+                                    width: 16,
+                                    height: 16,
+                                    objectFit: "contain",
+                                    borderRadius: "3px",
+                                  }}
+                                />
+                              )}
+                              <span>
+                                {cleanName}: ${entry.value.toLocaleString()}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   }
@@ -203,7 +321,6 @@ const MetricsChart = () => {
                 }}
               />
 
-              {/* Custom legend with cleaned names and colored text */}
               <Legend content={<CustomLegend />} />
 
               {assets.map((asset, i) => (
