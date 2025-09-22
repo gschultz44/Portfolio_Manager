@@ -17,11 +17,10 @@ import sunnyImage2 from "../assets/Sunny2.png";
 import rainyImage from "../assets/Rain.png";
 import rainyImage2 from "../assets/Rain2.png";
 
-// ✅ Import Logos
-import nasdaqLogo from "../assets/nasdaq_logo.jpeg";
+// ✅ Logos (Bitcoin removed)
+import nasdaqLogo from "../assets/nasdaq_logo.png";
 import amazonLogo from "../assets/amazon_logo.png";
 import appleLogo from "../assets/apple_logo.png";
-import bitcoinLogo from "../assets/bitcoin_logo.png";
 import ethereumLogo from "../assets/ethereum_logo.png";
 import gasLogo from "../assets/gas_logo.png";
 import goldLogo from "../assets/gold_logo.png";
@@ -35,24 +34,22 @@ import sp500Logo from "../assets/s_p_500_logo.png";
 import silverLogo from "../assets/silver_logo.png";
 import teslaLogo from "../assets/tesla_logo.png";
 
-// ✅ Logo Map
 const assetLogos = {
-  "NASDAQ": nasdaqLogo,
-  "Amazon": amazonLogo,
-  "Apple": appleLogo,
-  "Bitcoin": bitcoinLogo,
-  "Ethereum": ethereumLogo,
+  "Nasdaq 100": nasdaqLogo,
+  Amazon: amazonLogo,
+  Apple: appleLogo,
+  Ethereum: ethereumLogo,
   "Natural Gas": gasLogo,
-  "Gold": goldLogo,
-  "Google": googleLogo,
-  "Meta": metaLogo,
-  "Microsoft": microsoftLogo,
-  "Netflix": netflixLogo,
-  "Nvidia": nvidiaLogo,
-  "Oil": oilLogo,
+  Gold: goldLogo,
+  Google: googleLogo,
+  Meta: metaLogo,
+  Microsoft: microsoftLogo,
+  Netflix: netflixLogo,
+  Nvidia: nvidiaLogo,
+  "Crude oil": oilLogo,
   "S&P 500": sp500Logo,
-  "Silver": silverLogo,
-  "Tesla": teslaLogo,
+  Silver: silverLogo,
+  Tesla: teslaLogo,
 };
 
 // ✅ Helper: Calculate Up/Down Streaks
@@ -68,14 +65,36 @@ function getStreak(data, index, key) {
   return direction === "up" ? streak : -streak;
 }
 
-// ✅ Helper: Choose Background
 function pickBackground(streak) {
   const abs = Math.abs(streak);
   if (streak >= 0) return abs >= 2 ? sunnyImage2 : sunnyImage;
   return abs >= 2 ? rainyImage2 : rainyImage;
 }
 
-// ✅ Custom Legend with Logos
+const colorPalette = [
+  "rgb(234, 178, 86)",
+  "rgb(186, 186, 186)",
+  "rgb(235, 161, 68)",
+  "rgb(120, 117, 116)",
+  "rgb(137, 156, 230)",
+  "rgb(241, 192, 79)",
+  "rgb(92, 166, 114)",
+  "rgb(73, 160, 245)",
+  "rgb(246, 211, 74)",
+  "rgb(72, 161, 220)",
+  "rgb(93, 163, 92)",
+  "rgb(210, 52, 42)",
+  "rgb(152, 199, 64)",
+  "rgb(127, 219, 211)",
+  "rgb(241, 239, 236)",
+  "rgb(217, 56, 51)",
+];
+
+const getColor = (index) =>
+  index < colorPalette.length
+    ? colorPalette[index]
+    : `hsl(${(index * 137.5) % 360}, 70%, 55%)`;
+
 const CustomLegend = ({ payload }) => (
   <div
     style={{
@@ -86,17 +105,16 @@ const CustomLegend = ({ payload }) => (
       alignItems: "center",
     }}
   >
-    {payload?.map((entry) => {
-      const color = entry?.color || entry?.payload?.stroke || "#fff";
-      const raw = entry?.value ?? entry?.payload?.dataKey ?? "";
-      const clean = String(raw)
+    {payload?.map((entry, idx) => {
+      const color = getColor(idx);
+      const cleanName = String(entry.value)
         .replace(/_[^_]+$/, "")
         .replace(/_/g, " ");
-      const logo = assetLogos[clean];
+      const logo = assetLogos[cleanName];
 
       return (
         <div
-          key={raw}
+          key={`${entry.dataKey || entry.value}-${idx}`}
           style={{
             display: "flex",
             alignItems: "center",
@@ -109,7 +127,7 @@ const CustomLegend = ({ payload }) => (
           {logo && (
             <img
               src={logo}
-              alt={`${clean} logo`}
+              alt={`${cleanName} logo`}
               style={{
                 width: 20,
                 height: 20,
@@ -118,7 +136,7 @@ const CustomLegend = ({ payload }) => (
               }}
             />
           )}
-          <span>{clean}</span>
+          <span>{cleanName}</span>
         </div>
       );
     })}
@@ -134,19 +152,28 @@ const MetricsChart = () => {
     Papa.parse("/data.csv", {
       download: true,
       header: true,
-      dynamicTyping: true,
+      dynamicTyping: false,
       complete: ({ data }) => {
         const grouped = {};
         data.forEach((row) => {
           if (!row.Date || !row.Asset) return;
+          if (row.Asset === "Bitcoin_Price") return; // 🚫 skip Bitcoin
+
+          const price = row.Price
+            ? parseFloat(String(row.Price).replace(/,/g, ""))
+            : null;
+
           if (!grouped[row.Date]) grouped[row.Date] = { date: row.Date };
-          grouped[row.Date][row.Asset] = row.Price;
+          grouped[row.Date][row.Asset] = price;
         });
 
         const result = Object.values(grouped).sort(
           (a, b) => new Date(a.date) - new Date(b.date)
         );
-        const uniqueAssets = Array.from(new Set(data.map((r) => r.Asset)));
+
+        const uniqueAssets = Array.from(new Set(data.map((r) => r.Asset)))
+          .filter((asset) => asset !== "Bitcoin_Price")
+          .sort();
 
         setChartData(result);
         setAssets(uniqueAssets);
@@ -154,26 +181,12 @@ const MetricsChart = () => {
     });
   }, []);
 
-  // ✅ Background based on S&P 500 streak
-  const indexToUse =
-    hoveredIndex !== null ? hoveredIndex : chartData.length - 1;
+  const indexToUse = hoveredIndex !== null ? hoveredIndex : chartData.length - 1;
   const streak =
     chartData.length > 1 && indexToUse >= 1
       ? getStreak(chartData, indexToUse, "S&P_500_Price")
       : 0;
   const bg = chartData.length >= 2 ? pickBackground(streak) : null;
-
-  // ✅ Color palette fallback
-  const colorPalette = [
-    "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
-    "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe",
-    "#008080", "#e6beff", "#9a6324", "#fffac8", "#800000",
-    "#aaffc3", "#808000", "#ffd8b1", "#000075", "#808080",
-  ];
-  const getColor = (index) =>
-    index < colorPalette.length
-      ? colorPalette[index]
-      : `hsl(${(index * 137.5) % 360}, 70%, 55%)`;
 
   return (
     <div
@@ -190,7 +203,6 @@ const MetricsChart = () => {
         transition: "background-image 300ms ease-in-out",
       }}
     >
-      {/* Title */}
       <h1
         style={{
           position: "absolute",
@@ -240,7 +252,9 @@ const MetricsChart = () => {
             <LineChart
               data={chartData}
               onMouseMove={(state) =>
-                setHoveredIndex(state?.isTooltipActive ? state.activeTooltipIndex : null)
+                setHoveredIndex(
+                  state?.isTooltipActive ? state.activeTooltipIndex : null
+                )
               }
               onMouseLeave={() => setHoveredIndex(null)}
             >
@@ -250,12 +264,12 @@ const MetricsChart = () => {
                 stroke="#e5e7eb"
                 tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
               />
+              {/* ✅ Natural scaling — no domain override */}
               <YAxis
                 stroke="#e5e7eb"
                 tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
               />
 
-              {/* ✅ Tooltip with Logos + Sorted Values */}
               <Tooltip
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
@@ -287,7 +301,7 @@ const MetricsChart = () => {
 
                           return (
                             <div
-                              key={entry.name}
+                              key={`${entry.name}-${entry.value}`}
                               style={{
                                 display: "flex",
                                 alignItems: "center",
@@ -325,7 +339,7 @@ const MetricsChart = () => {
 
               {assets.map((asset, i) => (
                 <Line
-                  key={asset}
+                  key={`line-${asset}`}
                   type="monotone"
                   dataKey={asset}
                   stroke={getColor(i)}
