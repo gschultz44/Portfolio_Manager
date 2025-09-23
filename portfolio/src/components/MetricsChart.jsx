@@ -11,13 +11,13 @@ import {
 } from "recharts";
 import Papa from "papaparse";
 
-// ✅ Background Images
+// ✅ Background Images (used to visually indicate "market mood")
 import sunnyImage from "../assets/Sunny.png";
 import sunnyImage2 from "../assets/Sunny2.png";
 import rainyImage from "../assets/Rain.png";
 import rainyImage2 from "../assets/Rain2.png";
 
-// ✅ Logos (Bitcoin removed)
+// ✅ Asset Logos (Bitcoin intentionally excluded)
 import nasdaqLogo from "../assets/nasdaq_logo.png";
 import amazonLogo from "../assets/amazon_logo.png";
 import appleLogo from "../assets/apple_logo.png";
@@ -34,6 +34,7 @@ import sp500Logo from "../assets/s_p_500_logo.png";
 import silverLogo from "../assets/silver_logo.png";
 import teslaLogo from "../assets/tesla_logo.png";
 
+// Map asset names to their respective logos for display in legend & tooltips
 const assetLogos = {
   "Nasdaq 100": nasdaqLogo,
   Amazon: amazonLogo,
@@ -52,25 +53,30 @@ const assetLogos = {
   Tesla: teslaLogo,
 };
 
-// ✅ Helper: Calculate Up/Down Streaks
+// ✅ Helper: Calculate consecutive up/down streaks for a given data series
 function getStreak(data, index, key) {
   if (index <= 0) return 0;
+  // Determine if current value is up or down compared to previous value
   const direction = data[index][key] >= data[index - 1][key] ? "up" : "down";
   let streak = 1;
+  // Walk backward through data until direction flips
   for (let i = index - 1; i > 0; i--) {
     const prevDir = data[i][key] >= data[i - 1][key] ? "up" : "down";
     if (prevDir === direction) streak++;
     else break;
   }
+  // Return positive streak for "up" and negative for "down"
   return direction === "up" ? streak : -streak;
 }
 
+// Pick background image depending on market streak length and direction
 function pickBackground(streak) {
   const abs = Math.abs(streak);
-  if (streak >= 0) return abs >= 2 ? sunnyImage2 : sunnyImage;
-  return abs >= 2 ? rainyImage2 : rainyImage;
+  if (streak >= 0) return abs >= 2 ? sunnyImage2 : sunnyImage; // longer up streak = brighter sun
+  return abs >= 2 ? rainyImage2 : rainyImage; // longer down streak = heavier rain
 }
 
+// ✅ Color palette for multiple asset lines (fallback: generate HSL)
 const colorPalette = [
   "rgb(234, 178, 86)",
   "rgb(186, 186, 186)",
@@ -93,8 +99,9 @@ const colorPalette = [
 const getColor = (index) =>
   index < colorPalette.length
     ? colorPalette[index]
-    : `hsl(${(index * 137.5) % 360}, 70%, 55%)`;
+    : `hsl(${(index * 137.5) % 360}, 70%, 55%)`; // ensure unique color if many assets
 
+// ✅ Custom Legend with logos and asset names
 const CustomLegend = ({ payload }) => (
   <div
     style={{
@@ -107,6 +114,7 @@ const CustomLegend = ({ payload }) => (
   >
     {payload?.map((entry, idx) => {
       const color = getColor(idx);
+      // Clean up asset name: remove trailing suffixes, replace underscores with spaces
       const cleanName = String(entry.value)
         .replace(/_[^_]+$/, "")
         .replace(/_/g, " ");
@@ -124,6 +132,7 @@ const CustomLegend = ({ payload }) => (
             fontSize: "14px",
           }}
         >
+          {/* Display logo if available */}
           {logo && (
             <img
               src={logo}
@@ -144,10 +153,11 @@ const CustomLegend = ({ payload }) => (
 );
 
 const MetricsChart = () => {
-  const [chartData, setChartData] = useState([]);
-  const [assets, setAssets] = useState([]);
-  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [chartData, setChartData] = useState([]); // formatted data for chart
+  const [assets, setAssets] = useState([]); // list of unique asset names
+  const [hoveredIndex, setHoveredIndex] = useState(null); // which index is hovered for streak calc
 
+  // ✅ Load & parse CSV data on component mount
   useEffect(() => {
     Papa.parse("/data.csv", {
       download: true,
@@ -157,20 +167,24 @@ const MetricsChart = () => {
         const grouped = {};
         data.forEach((row) => {
           if (!row.Date || !row.Asset) return;
-          if (row.Asset === "Bitcoin_Price") return; // 🚫 skip Bitcoin
+          if (row.Asset === "Bitcoin_Price") return; // 🚫 Skip Bitcoin rows
 
+          // Convert string price to float, strip commas
           const price = row.Price
             ? parseFloat(String(row.Price).replace(/,/g, ""))
             : null;
 
+          // Group prices by date, building one object per date
           if (!grouped[row.Date]) grouped[row.Date] = { date: row.Date };
           grouped[row.Date][row.Asset] = price;
         });
 
+        // Sort by date ascending
         const result = Object.values(grouped).sort(
           (a, b) => new Date(a.date) - new Date(b.date)
         );
 
+        // Collect unique asset names for legend & line generation
         const uniqueAssets = Array.from(new Set(data.map((r) => r.Asset)))
           .filter((asset) => asset !== "Bitcoin_Price")
           .sort();
@@ -181,11 +195,16 @@ const MetricsChart = () => {
     });
   }, []);
 
+  // Determine which index to use (hovered or latest)
   const indexToUse = hoveredIndex !== null ? hoveredIndex : chartData.length - 1;
+
+  // Compute current market streak based on S&P 500 price
   const streak =
     chartData.length > 1 && indexToUse >= 1
       ? getStreak(chartData, indexToUse, "S&P_500_Price")
       : 0;
+
+  // Select background image based on streak direction and length
   const bg = chartData.length >= 2 ? pickBackground(streak) : null;
 
   return (
@@ -196,13 +215,14 @@ const MetricsChart = () => {
         width: "100vw",
         overflow: "hidden",
         backgroundColor: "#000",
-        backgroundImage: bg ? `url(${bg})` : "none",
+        backgroundImage: bg ? `url(${bg})` : "none", // dynamic background
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         transition: "background-image 300ms ease-in-out",
       }}
     >
+      {/* Title overlay */}
       <h1
         style={{
           position: "absolute",
@@ -220,6 +240,7 @@ const MetricsChart = () => {
         Market Climate
       </h1>
 
+      {/* Semi-transparent top bar */}
       <div
         style={{
           height: 68,
@@ -228,6 +249,7 @@ const MetricsChart = () => {
         }}
       />
 
+      {/* Chart container */}
       <div
         style={{
           minHeight: "calc(100vh - 68px)",
@@ -258,18 +280,20 @@ const MetricsChart = () => {
               }
               onMouseLeave={() => setHoveredIndex(null)}
             >
+              {/* Grid and Axes */}
               <CartesianGrid strokeDasharray="4 4" stroke="#444" />
               <XAxis
                 dataKey="date"
                 stroke="#e5e7eb"
                 tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
               />
-              {/* ✅ Natural scaling — no domain override */}
+              {/* Y-axis uses natural scale (no manual domain override) */}
               <YAxis
                 stroke="#e5e7eb"
                 tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
               />
 
+              {/* Custom tooltip with logos and formatted prices */}
               <Tooltip
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
@@ -278,6 +302,7 @@ const MetricsChart = () => {
                     );
                     if (!validEntries.length) return null;
 
+                    // Sort descending by value for readability
                     const sortedPayload = validEntries.sort(
                       (a, b) => b.value - a.value
                     );
@@ -335,8 +360,10 @@ const MetricsChart = () => {
                 }}
               />
 
+              {/* Legend with custom logos */}
               <Legend content={<CustomLegend />} />
 
+              {/* Render a line for each asset */}
               {assets.map((asset, i) => (
                 <Line
                   key={`line-${asset}`}
