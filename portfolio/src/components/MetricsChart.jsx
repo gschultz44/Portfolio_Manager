@@ -167,7 +167,7 @@ const MetricsChart = () => {
         const grouped = {};
         data.forEach((row) => {
           if (!row.Date || !row.Asset) return;
-          if (row.Asset === "Bitcoin_Price") return; // 🚫 Skip Bitcoin rows
+          if (row.Asset === "Bitcoin_Price" || row.Asset == "Nasdaq_100_Price") return; // 🚫 Skip Bitcoin rows
 
           // Convert string price to float, strip commas
           const price = row.Price
