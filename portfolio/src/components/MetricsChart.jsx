@@ -131,7 +131,7 @@ const CustomLegend = ({ payload }) => (
             fontSize: "14px",
           }}
         >
-          {/* Display logo if available */}
+          {/* Display logo if available   */}
           {logo && (
             <img
               src={logo}
