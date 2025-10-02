@@ -156,7 +156,7 @@ const MetricsChart = () => {
   const [assets, setAssets] = useState([]); // list of unique asset names
   const [hoveredIndex, setHoveredIndex] = useState(null); // which index is hovered for streak calc
 
-  // ✅ Load & parse CSV data on component mount
+  // Load & parse CSV data on component mount
   useEffect(() => {
     Papa.parse("/data.csv", {
       download: true,
