@@ -158,7 +158,7 @@ const MetricsChart = () => {
 
   // Load & parse CSV data on component mount
   useEffect(() => {
-    Papa.parse("/data.csv", {
+    Papa.parse("/data_with_forecast.csv", {
       download: true,
       header: true,
       dynamicTyping: false,
@@ -285,7 +285,11 @@ const MetricsChart = () => {
                 dataKey="date"
                 stroke="#e5e7eb"
                 tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
+                angle={-45}            // tilt 45 degrees upward
+                textAnchor="end"       // align text properly with the tick
+                height={70}            // give extra space for the angled labels
               />
+
               {/* Y-axis uses natural scale (no manual domain override) */}
               <YAxis
                 stroke="#e5e7eb"

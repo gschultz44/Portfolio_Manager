@@ -1,1 +1,2 @@
 Started to play around with predictive techniques and cleaned up code: https://colab.research.google.com/drive/1vEOgL6a3NJyJwhC1rY2RAdX_J9wO8JMU
+Monte carlo simulation: https://colab.research.google.com/drive/1mDzoiFJAvTjV4kWGxDQznlIakdMs547Z
