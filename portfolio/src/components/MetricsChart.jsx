@@ -56,16 +56,13 @@ const assetLogos = {
 // ✅ Helper: Calculate consecutive up/down streaks for a given data series
 function getStreak(data, index, key) {
   if (index <= 0) return 0;
-  // Determine if current value is up or down compared to previous value
   const direction = data[index][key] >= data[index - 1][key] ? "up" : "down";
   let streak = 1;
-  // Walk backward through data until direction flips
   for (let i = index - 1; i > 0; i--) {
     const prevDir = data[i][key] >= data[i - 1][key] ? "up" : "down";
     if (prevDir === direction) streak++;
     else break;
   }
-  // Return positive streak for "up" and negative for "down"
   return direction === "up" ? streak : -streak;
 }
 
@@ -86,19 +83,26 @@ const colorPalette = [
   "rgb(241, 192, 79)",
   "rgb(73, 160, 246)",
   "rgb(154, 199, 63)",
-  "rgb(72, 160, 219)",
   "rgb(93, 163, 91)",
   "rgb(210, 52, 42)",
   "rgb(152, 198, 63)",
-  "rgb(96, 162, 157)",
   "rgb(242, 240, 238)",
-  "rgb(217, 56, 238)"
+  "rgb(210, 52, 42)",
 ];
 
 const getColor = (index) =>
   index < colorPalette.length
     ? colorPalette[index]
-    : `hsl(${(index * 137.5) % 360}, 70%, 55%)`; // ensure unique color if many assets
+    : `hsl(${(index * 137.5) % 360}, 70%, 55%)`;
+
+// ✅ UTC date helpers
+const fmtUTC = (ts) => {
+  const d = new Date(ts);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
 
 // ✅ Custom Legend with logos and asset names
 const CustomLegend = ({ payload }) => (
@@ -113,7 +117,6 @@ const CustomLegend = ({ payload }) => (
   >
     {payload?.map((entry, idx) => {
       const color = getColor(idx);
-      // Clean up asset name: remove trailing suffixes, replace underscores with spaces
       const cleanName = String(entry.value)
         .replace(/_[^_]+$/, "")
         .replace(/_/g, " ");
@@ -131,7 +134,6 @@ const CustomLegend = ({ payload }) => (
             fontSize: "14px",
           }}
         >
-          {/* Display logo if available   */}
           {logo && (
             <img
               src={logo}
@@ -152,7 +154,7 @@ const CustomLegend = ({ payload }) => (
 );
 
 const MetricsChart = () => {
-  const [chartData, setChartData] = useState([]); // formatted data for chart
+  const [chartData, setChartData] = useState([]); // [{ dateTs, dateLabel, <assetA>: price, ... }, ...]
   const [assets, setAssets] = useState([]); // list of unique asset names
   const [hoveredIndex, setHoveredIndex] = useState(null); // which index is hovered for streak calc
 
@@ -164,28 +166,43 @@ const MetricsChart = () => {
       dynamicTyping: false,
       complete: ({ data }) => {
         const grouped = {};
-        data.forEach((row) => {
-          if (!row.Date || !row.Asset) return;
-          if (row.Asset === "Bitcoin_Price" || row.Asset == "Nasdaq_100_Price") return; // 🚫 Skip Bitcoin rows
+        const assetsSet = new Set();
+        const excludeAssets = new Set(["Bitcoin_Price", "Nasdaq_100_Price", "S&P_500_Price"]);
 
-          // Convert string price to float, strip commas
+        data.forEach((row) => {
+          const rawDate = row.Date;
+          const asset = row.Asset;
+          if (!rawDate || !asset) return;
+          if (excludeAssets.has(asset)) return;
+
+          // Parse YYYY-MM-DD (or YYYY-MM-DD ...anything) → UTC midnight
+          const m = String(rawDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+          if (!m) return;
+          const [_, yStr, moStr, dStr] = m;
+          const y = Number(yStr),
+            mo = Number(moStr),
+            d = Number(dStr);
+          const tsUTC = Date.UTC(y, mo - 1, d);
+          const label = `${yStr}-${moStr}-${dStr}`;
+
+          // Price
           const price = row.Price
             ? parseFloat(String(row.Price).replace(/,/g, ""))
             : null;
 
-          // Group prices by date, building one object per date
-          if (!grouped[row.Date]) grouped[row.Date] = { date: row.Date };
-          grouped[row.Date][row.Asset] = price;
+          // Group rows by day label
+          if (!grouped[label]) grouped[label] = { dateLabel: label, dateTs: tsUTC };
+          grouped[label][asset] = price;
+
+          assetsSet.add(asset);
         });
 
-        // Sort by date ascending
-        const result = Object.values(grouped).sort(
-          (a, b) => new Date(a.date) - new Date(b.date)
-        );
+        // Sort chronologically by timestamp
+        const result = Object.values(grouped).sort((a, b) => a.dateTs - b.dateTs);
 
-        // Collect unique asset names for legend & line generation
-        const uniqueAssets = Array.from(new Set(data.map((r) => r.Asset)))
-          .filter((asset) => asset !== "Bitcoin_Price")
+        // Unique asset list (filtered, sorted)
+        const uniqueAssets = Array.from(assetsSet)
+          .filter((a) => !excludeAssets.has(a))
           .sort();
 
         setChartData(result);
@@ -197,10 +214,14 @@ const MetricsChart = () => {
   // Determine which index to use (hovered or latest)
   const indexToUse = hoveredIndex !== null ? hoveredIndex : chartData.length - 1;
 
-  // Compute current market streak based on S&P 500 price
+  // Compute current market streak based on S&P 500 price (use the key that exists in your CSV)
+  const streakKey = "S&P 500"; // adjust if your CSV uses a different exact name
   const streak =
-    chartData.length > 1 && indexToUse >= 1
-      ? getStreak(chartData, indexToUse, "S&P_500_Price")
+    chartData.length > 1 &&
+    indexToUse >= 1 &&
+    chartData[0] &&
+    Object.prototype.hasOwnProperty.call(chartData[0], streakKey)
+      ? getStreak(chartData, indexToUse, streakKey)
       : 0;
 
   // Select background image based on streak direction and length
@@ -214,7 +235,7 @@ const MetricsChart = () => {
         width: "100vw",
         overflow: "hidden",
         backgroundColor: "#000",
-        backgroundImage: bg ? `url(${bg})` : "none", // dynamic background
+        backgroundImage: bg ? `url(${bg})` : "none",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
@@ -281,31 +302,37 @@ const MetricsChart = () => {
             >
               {/* Grid and Axes */}
               <CartesianGrid strokeDasharray="4 4" stroke="#444" />
+
+              {/* ✅ TIME-SCALE X AXIS (no time-of-day shown) */}
               <XAxis
-                dataKey="date"
+                dataKey="dateTs"
+                type="number"
+                scale="time"
+                domain={["dataMin", "dataMax"]}
+                tickFormatter={(ts) => fmtUTC(ts)}
                 stroke="#e5e7eb"
                 tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
-                angle={-45}            // tilt 45 degrees upward
-                textAnchor="end"       // align text properly with the tick
-                height={70}            // give extra space for the angled labels
+                angle={-45}
+                textAnchor="end"
+                height={70}
               />
 
-              {/* Y-axis uses natural scale (no manual domain override) */}
+              {/* Y-axis uses natural scale */}
               <YAxis
                 stroke="#e5e7eb"
                 tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
               />
 
-              {/* Custom tooltip with logos and formatted prices */}
+              {/* ✅ Tooltip with UTC date label and logos */}
               <Tooltip
-                content={({ active, payload }) => {
+                labelFormatter={(ts) => fmtUTC(ts)}
+                content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
                     const validEntries = payload.filter(
                       (entry) => entry.name && Number.isFinite(entry.value)
                     );
                     if (!validEntries.length) return null;
 
-                    // Sort descending by value for readability
                     const sortedPayload = validEntries.sort(
                       (a, b) => b.value - a.value
                     );
@@ -321,6 +348,10 @@ const MetricsChart = () => {
                           fontWeight: "bold",
                         }}
                       >
+                        <div style={{ marginBottom: 6 }}>
+                          {fmtUTC(label)}
+                        </div>
+
                         {sortedPayload.map((entry) => {
                           const cleanName = String(entry.name)
                             .replace(/_[^_]+$/, "")
