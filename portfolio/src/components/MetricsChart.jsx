@@ -73,7 +73,7 @@ function pickBackground(streak) {
   return abs >= 2 ? rainyImage2 : rainyImage; // longer down streak = heavier rain
 }
 
-// Color palette for multiple asset lines (fallback: generate HSL)
+// Color palette for multiple asset lines
 const colorPalette = [
   "rgb(234, 178, 86)",
   "rgb(186, 186, 186)",
