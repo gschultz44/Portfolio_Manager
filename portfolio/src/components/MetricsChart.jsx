@@ -66,7 +66,6 @@ function getStreak(data, index, key) {
   return direction === "up" ? streak : -streak;
 }
 
-// Pick background image depending on market streak length and direction
 function pickBackground(streak) {
   const abs = Math.abs(streak);
   if (streak >= 0) return abs >= 2 ? sunnyImage2 : sunnyImage; // longer up streak = brighter sun
