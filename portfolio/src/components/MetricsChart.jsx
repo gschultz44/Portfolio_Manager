@@ -86,7 +86,7 @@ const assetAbout = {
     "The S&P 500 Index (Standard & Poor’s 500, ticker: SPX) is one of the most widely followed stock market benchmarks in the world, representing the performance of 500 of the largest publicly traded companies in the United States. It spans all major sectors of the economy, including technology, healthcare, finance, energy, and consumer goods, providing a comprehensive snapshot of the overall U.S. stock market and economy. The index is market-cap weighted, meaning that larger companies like Apple, Microsoft, Amazon, and NVIDIA have a greater influence on its movements. The S&P 500 is often used by investors as a measure of broad market health and as a benchmark for portfolio performance. Historically, it has delivered steady long-term growth, reflecting the resilience and innovation of the U.S. economy. Investors can gain exposure through index funds and ETFs such as the SPDR S&P 500 ETF (SPY), making it a cornerstone of both institutional and individual investment strategies.",
 };
 
-// ✅ Helper: Calculate consecutive up/down streaks for a given data series
+//  Helper: Calculate consecutive up/down streaks for a given data series
 function getStreak(data, index, key) {
   if (index <= 0) return 0;
   const direction = data[index][key] >= data[index - 1][key] ? "up" : "down";
