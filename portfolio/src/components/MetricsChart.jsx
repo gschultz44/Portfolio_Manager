@@ -53,7 +53,17 @@ const assetLogos = {
   Tesla: teslaLogo,
 };
 
-// Optional: lightweight “about” blurbs (edit freely)
+// Used ONLY for background streak logic, not rendered
+const STREAK_ASSET_KEY = "S&P_500_Price";
+
+// Assets we NEVER want to render as lines/legend items
+const hiddenFromChart = new Set([
+  "Bitcoin_Price",
+  "Nasdaq_100_Price",
+  // NOTE: DO NOT add STREAK_ASSET_KEY here
+]);
+
+// Optional: long “about” blurbs (your versions)
 const assetAbout = {
   Apple:
     "Apple Inc. (NASDAQ: AAPL) is one of the most influential and widely held stocks in the world, often regarded as a cornerstone of major market indices like the S&P 500 and Nasdaq 100. Known for its consistent performance and strong financial fundamentals, Apple’s stock reflects the company’s ability to innovate, generate steady revenue, and maintain high profit margins across its product lines. Driven by iPhone sales, expanding services revenue, and strong brand loyalty, Apple has demonstrated resilience even amid market volatility. The company regularly returns value to shareholders through dividends and aggressive share buybacks, making it a favorite among both institutional and retail investors. Over time, Apple’s stock has become a benchmark for the broader technology sector, symbolizing stability, growth, and investor confidence in long-term innovation.",
@@ -71,7 +81,8 @@ const assetAbout = {
     "Netflix, Inc. (NASDAQ: NFLX) is a leading global streaming entertainment company whose stock reflects both its pioneering role in the digital media industry and its adaptability in a highly competitive market. Originally a DVD-by-mail service, Netflix transformed into a streaming powerhouse, reshaping how audiences consume television and film. Its stock performance has been driven by strong subscriber growth, international expansion, and a commitment to original content, which has produced global hits across genres and languages. Although Netflix has faced periods of volatility due to rising competition from other streaming platforms and shifting consumer trends, it continues to demonstrate resilience through innovations like ad-supported tiers and gaming initiatives. As one of the key “FAANG” stocks, Netflix remains a major influence on the entertainment sector and a symbol of the ongoing evolution of digital content consumption.",
   Meta:
     "Meta Platforms, Inc. (NASDAQ: META), formerly known as Facebook, is one of the world’s largest social media and technology companies, and its stock reflects both its dominance in digital advertising and its ambitious pivot toward the metaverse. Meta’s core platforms — Facebook, Instagram, WhatsApp, and Messenger — generate massive user engagement and advertising revenue, forming the foundation of its financial strength. In recent years, the company has expanded its focus to include virtual and augmented reality through its Reality Labs division, investing heavily in technologies that aim to shape the future of digital interaction. Meta’s stock has experienced volatility tied to advertising trends, regulatory scrutiny, and investor reactions to its metaverse spending, but it has also rebounded strongly amid growing interest in AI integration and cost-efficiency measures. As a key component of the S&P 500 and Nasdaq 100, Meta remains a defining force in both social media innovation and next-generation computing.",
-  Gold: "Gold (ticker: XAU/USD or tracked through ETFs like GLD) is one of the world’s oldest and most enduring investment assets, often viewed as a safe haven during times of economic uncertainty. Unlike stocks or bonds, gold does not generate income, but it holds intrinsic value and serves as a hedge against inflation, currency fluctuations, and market volatility. Its price tends to rise when investor confidence in financial markets declines or when central banks implement loose monetary policies. Gold is also influenced by global demand for jewelry, central bank reserves, and geopolitical tensions. While its short-term movements can be volatile, gold’s long-term stability and historical role as a store of value make it a core component of many diversified investment portfolios, appealing to both institutional and individual investors seeking security and balance.",
+  Gold:
+    "Gold (ticker: XAU/USD or tracked through ETFs like GLD) is one of the world’s oldest and most enduring investment assets, often viewed as a safe haven during times of economic uncertainty. Unlike stocks or bonds, gold does not generate income, but it holds intrinsic value and serves as a hedge against inflation, currency fluctuations, and market volatility. Its price tends to rise when investor confidence in financial markets declines or when central banks implement loose monetary policies. Gold is also influenced by global demand for jewelry, central bank reserves, and geopolitical tensions. While its short-term movements can be volatile, gold’s long-term stability and historical role as a store of value make it a core component of many diversified investment portfolios, appealing to both institutional and individual investors seeking security and balance.",
   Silver:
     "Silver (ticker: XAG/USD or tracked through ETFs like SLV) is a precious metal valued both as an investment asset and an essential industrial commodity. Its dual role gives silver a unique position in the global market—serving as both a store of value, like gold, and a key material in industries such as electronics, solar energy, and medical technology. Silver’s price is often more volatile than gold’s, as it is influenced not only by investor sentiment and inflation expectations but also by changes in industrial demand and global economic growth. Historically, silver has been viewed as a hedge against currency depreciation and inflation, and it often moves in tandem with gold during periods of financial uncertainty. Because of its affordability, high liquidity, and diverse applications, silver remains a popular choice for investors seeking exposure to precious metals with greater growth potential.",
   "Crude oil":
@@ -86,6 +97,7 @@ const assetAbout = {
     "The S&P 500 Index (Standard & Poor’s 500, ticker: SPX) is one of the most widely followed stock market benchmarks in the world, representing the performance of 500 of the largest publicly traded companies in the United States. It spans all major sectors of the economy, including technology, healthcare, finance, energy, and consumer goods, providing a comprehensive snapshot of the overall U.S. stock market and economy. The index is market-cap weighted, meaning that larger companies like Apple, Microsoft, Amazon, and NVIDIA have a greater influence on its movements. The S&P 500 is often used by investors as a measure of broad market health and as a benchmark for portfolio performance. Historically, it has delivered steady long-term growth, reflecting the resilience and innovation of the U.S. economy. Investors can gain exposure through index funds and ETFs such as the SPDR S&P 500 ETF (SPY), making it a cornerstone of both institutional and individual investment strategies.",
 };
 
+// ✅ Helper: Calculate consecutive up/down streaks
 function getStreak(data, index, key) {
   if (index <= 0) return 0;
   const direction = data[index][key] >= data[index - 1][key] ? "up" : "down";
@@ -100,8 +112,8 @@ function getStreak(data, index, key) {
 
 function pickBackground(streak) {
   const abs = Math.abs(streak);
-  if (streak >= 0) return abs >= 2 ? sunnyImage2 : sunnyImage; // longer up streak = brighter sun
-  return abs >= 2 ? rainyImage2 : rainyImage; // longer down streak = heavier rain
+  if (streak >= 0) return abs >= 2 ? sunnyImage2 : sunnyImage;
+  return abs >= 2 ? rainyImage2 : rainyImage;
 }
 
 const colorPalette = [
@@ -147,7 +159,7 @@ const CustomLegend = ({ payload, onSelectAsset }) => (
   >
     {payload?.map((entry, idx) => {
       const color = getColor(idx);
-      const rawKey = String(entry.value); // actual dataKey from chart
+      const rawKey = String(entry.value); // actual dataKey from chartData
       const cleanName = rawKey.replace(/_[^_]+$/, "").replace(/_/g, " ");
       const logo = assetLogos[cleanName];
 
@@ -234,7 +246,6 @@ function StatCard({ label, value, fmt }) {
 function AssetDetail({ assetKey, displayName, allData, onBack }) {
   const logo = assetLogos[displayName];
 
-  // Compute quick stats (latest, 7d change, 30d change)
   const { latest, chg7, chg30 } = useMemo(() => {
     if (!allData?.length) return { latest: null, chg7: null, chg30: null };
     const priceSeries = allData
@@ -371,7 +382,7 @@ function AssetDetail({ assetKey, displayName, allData, onBack }) {
             />
             <Line
               type="monotone"
-              dataKey={assetKey} // REAL data key from CSV (e.g., Apple_Price)
+              dataKey={assetKey}
               stroke="rgb(73, 160, 246)"
               strokeWidth={3}
               dot={false}
@@ -386,16 +397,12 @@ function AssetDetail({ assetKey, displayName, allData, onBack }) {
 
 // ---------- Main ----------
 const MetricsChart = () => {
-  const [chartData, setChartData] = useState([]); // [{ dateTs, dateLabel, <assetRawKey>: price, ... }, ...]
-  const [assets, setAssets] = useState([]); // list of unique asset raw keys
-  const [hoveredIndex, setHoveredIndex] = useState(null); // which index is hovered for streak calc
-  const [showInfo, setShowInfo] = useState(false); // info bubble toggle
-
-  // NEW: which asset's detail screen is open
-  // { dataKey: "Apple_Price", displayName: "Apple" } or null
+  const [chartData, setChartData] = useState([]);
+  const [assets, setAssets] = useState([]);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [showInfo, setShowInfo] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(null);
 
-  // Load & parse CSV data on component mount
   useEffect(() => {
     Papa.parse("/data_with_forecast.csv", {
       download: true,
@@ -404,19 +411,13 @@ const MetricsChart = () => {
       complete: ({ data }) => {
         const grouped = {};
         const assetsSet = new Set();
-        const excludeAssets = new Set([
-          "Bitcoin_Price",
-          "Nasdaq_100_Price",
-          "S&P_500_Price",
-        ]);
 
         data.forEach((row) => {
           const rawDate = row.Date;
           const asset = row.Asset;
           if (!rawDate || !asset) return;
-          if (excludeAssets.has(asset)) return;
 
-          // Parse YYYY-MM-DD (or YYYY-MM-DD ...anything) → UTC midnight
+          // Parse YYYY-MM-DD → UTC midnight
           const m = String(rawDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
           if (!m) return;
           const [_, yStr, moStr, dStr] = m;
@@ -426,24 +427,26 @@ const MetricsChart = () => {
           const tsUTC = Date.UTC(y, mo - 1, d);
           const label = `${yStr}-${moStr}-${dStr}`;
 
-          // Price
           const price = row.Price
             ? parseFloat(String(row.Price).replace(/,/g, ""))
             : null;
 
-          // Group rows by day label
           if (!grouped[label]) grouped[label] = { dateLabel: label, dateTs: tsUTC };
           grouped[label][asset] = price;
 
-          assetsSet.add(asset); // raw key as it appears in CSV (e.g., Apple_Price)
+          // Track all assets (including S&P_500_Price for streaks)
+          assetsSet.add(asset);
         });
 
-        // Sort chronologically by timestamp
-        const result = Object.values(grouped).sort((a, b) => a.dateTs - b.dateTs);
+        const result = Object.values(grouped).sort(
+          (a, b) => a.dateTs - b.dateTs
+        );
 
-        // Unique asset raw keys (filtered, sorted)
+        // Assets to actually draw as lines (hide Bitcoin, Nasdaq_100, and S&P_500_Price)
         const uniqueAssets = Array.from(assetsSet)
-          .filter((a) => !excludeAssets.has(a))
+          .filter(
+            (a) => !hiddenFromChart.has(a) && a !== STREAK_ASSET_KEY
+          )
           .sort();
 
         setChartData(result);
@@ -452,22 +455,17 @@ const MetricsChart = () => {
     });
   }, []);
 
-  // Determine which index to use (hovered or latest)
   const indexToUse = hoveredIndex !== null ? hoveredIndex : chartData.length - 1;
 
-  // Compute current market streak based on S&P 500 price (use the key that exists in your CSV)
-  const streakKey = "S&P 500"; // adjust if your CSV uses a different exact name
   const streak =
     chartData.length > 1 &&
     indexToUse >= 1 &&
     chartData[0] &&
-    Object.prototype.hasOwnProperty.call(chartData[0], streakKey)
-      ? getStreak(chartData, indexToUse, streakKey)
+    Object.prototype.hasOwnProperty.call(chartData[0], STREAK_ASSET_KEY)
+      ? getStreak(chartData, indexToUse, STREAK_ASSET_KEY)
       : 0;
 
-  // Select background image based on streak direction and length
   const bg = chartData.length >= 2 ? pickBackground(streak) : null;
-
   const isDetail = Boolean(selectedAsset);
 
   return (
@@ -485,7 +483,7 @@ const MetricsChart = () => {
         transition: "background-image 300ms ease-in-out",
       }}
     >
-      {/* Title overlay */}
+      {/* Title */}
       <h1
         style={{
           position: "absolute",
@@ -503,7 +501,7 @@ const MetricsChart = () => {
         {isDetail ? "Asset Detail" : "Market Climate"}
       </h1>
 
-      {/* Info Icon and Tooltip (overview only) */}
+      {/* Info Icon (overview only) */}
       {!isDetail && (
         <div
           style={{
@@ -586,13 +584,13 @@ const MetricsChart = () => {
                   of assets, including major stocks, commodities, and cryptocurrencies. Each
                   colored line represents an asset’s performance over time, with corresponding
                   logos in the legend for easy identification. The chart’s background changes
-                  between sunny and rainy themes depending on the recent streak of the
-                  most popular stock, sunny for consecutive gains and rainy for consecutive
-                  losses, providing a quick sense of overall market mood. Hovering over the
-                  chart reveals a tooltip displaying each asset’s exact price for that date,
-                  allowing for clear comparisons. The x-axis shows the date in UTC, while the
-                  y-axis indicates price levels, making this visualization an engaging way to
-                  view both detailed data and broader market trends at once.
+                  between sunny and rainy themes depending on the recent streak of the S&amp;P
+                  500—sunny for consecutive gains and rainy for consecutive losses—providing a
+                  quick sense of overall market mood. Hovering over the chart reveals a tooltip
+                  displaying each asset’s exact price for that date, allowing for clear
+                  comparisons. The x-axis shows the date in UTC, while the y-axis indicates
+                  price levels, making this visualization an engaging way to view both detailed
+                  data and broader market trends at once.
                 </p>
 
                 <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
@@ -606,7 +604,7 @@ const MetricsChart = () => {
         </div>
       )}
 
-      {/* Semi-transparent top bar */}
+      {/* Top bar */}
       <div
         style={{
           height: 68,
@@ -615,7 +613,7 @@ const MetricsChart = () => {
         }}
       />
 
-      {/* Main screen container */}
+      {/* Main content */}
       <div
         style={{
           minHeight: "calc(100vh - 68px)",
@@ -625,7 +623,6 @@ const MetricsChart = () => {
           padding: 24,
         }}
       >
-        {/* Detail Screen */}
         {selectedAsset ? (
           <AssetDetail
             assetKey={selectedAsset.dataKey}
@@ -634,7 +631,6 @@ const MetricsChart = () => {
             onBack={() => setSelectedAsset(null)}
           />
         ) : (
-          // Overview Screen
           <div
             style={{
               width: "92%",
@@ -656,10 +652,7 @@ const MetricsChart = () => {
                 }
                 onMouseLeave={() => setHoveredIndex(null)}
               >
-                {/* Grid and Axes */}
                 <CartesianGrid strokeDasharray="4 4" stroke="#444" />
-
-                {/* ✅ TIME-SCALE X AXIS (no time-of-day shown) */}
                 <XAxis
                   dataKey="dateTs"
                   type="number"
@@ -672,14 +665,10 @@ const MetricsChart = () => {
                   textAnchor="end"
                   height={70}
                 />
-
-                {/* Y-axis uses natural scale */}
                 <YAxis
                   stroke="#e5e7eb"
                   tick={{ fill: "#e5e7eb", fontSize: 14, fontWeight: 700 }}
                 />
-
-                {/* ✅ Tooltip with UTC date label and logos */}
                 <Tooltip
                   labelFormatter={(ts) => fmtUTC(ts)}
                   content={({ active, payload, label }) => {
@@ -705,13 +694,11 @@ const MetricsChart = () => {
                           }}
                         >
                           <div style={{ marginBottom: 6 }}>{fmtUTC(label)}</div>
-
                           {sortedPayload.map((entry) => {
                             const cleanName = String(entry.name)
                               .replace(/_[^_]+$/, "")
                               .replace(/_/g, " ");
                             const logo = assetLogos[cleanName];
-
                             return (
                               <div
                                 key={`${entry.name}-${entry.value}`}
@@ -747,8 +734,6 @@ const MetricsChart = () => {
                     return null;
                   }}
                 />
-
-                {/* Legend with custom logos (now clickable) */}
                 <Legend
                   content={(props) => (
                     <CustomLegend
@@ -759,13 +744,11 @@ const MetricsChart = () => {
                     />
                   )}
                 />
-
-                {/* Render a line for each asset (use RAW keys) */}
                 {assets.map((assetKey, i) => (
                   <Line
                     key={`line-${assetKey}`}
                     type="monotone"
-                    dataKey={assetKey} // raw key like "Apple_Price"
+                    dataKey={assetKey}
                     stroke={getColor(i)}
                     strokeWidth={3}
                     dot={false}
