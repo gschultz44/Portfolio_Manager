@@ -501,7 +501,6 @@ const MetricsChart = () => {
         {isDetail ? "Asset Detail" : "Market Climate"}
       </h1>
 
-      {/* Info Icon (overview only) */}
       {!isDetail && (
         <div
           style={{
