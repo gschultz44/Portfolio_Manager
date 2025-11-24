@@ -278,7 +278,6 @@ function AssetDetail({ assetKey, displayName, allData, onBack }) {
         gap: 12,
       }}
     >
-      {/* Header */}
       <div
         style={{
           display: "flex",
